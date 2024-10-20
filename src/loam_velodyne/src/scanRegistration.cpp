@@ -32,12 +32,17 @@
 
 
 
-/******************************读前须知*****************************************/
-/*imu为x轴向前,y轴向左,z轴向上的右手坐标系，
+/******************************Notes before reading [读前须知]*****************************/
+/*imu is a right-handed coordinate system with x-axis forward, y-axis left, and z-axis upward.
+Velodyne lidar is installed as a right-handed coordinate system with x-axis forward, y-axis left, and z-axis upward.
+ScanRegistration will unify the two into a right-handed coordinate system with z-axis forward, x-axis left, and y-axis upward by exchanging the coordinate axes.
+This is the coordinate system used in J. Zhang's paper.
+After the exchange: R = Ry(yaw)*Rx(pitch)*Rz(roll)
+[imu为x轴向前,y轴向左,z轴向上的右手坐标系，
   velodyne lidar被安装为x轴向前,y轴向左,z轴向上的右手坐标系，
   scanRegistration会把两者通过交换坐标轴，都统一到z轴向前,x轴向左,y轴向上的右手坐标系
   ，这是J. Zhang的论文里面使用的坐标系
-  交换后：R = Ry(yaw)*Rx(pitch)*Rz(roll)
+  交换后：R = Ry(yaw)*Rx(pitch)*Rz(roll)]
 *******************************************************************************/
 
 #include <cmath>
@@ -62,49 +67,52 @@ using std::sin;
 using std::cos;
 using std::atan2;
 
-//扫描周期, velodyne频率10Hz，周期0.1s
+//Scanning cycle, velodyne frequency 10Hz, period 0.1s [扫描周期, velodyne频率10Hz，周期0.1s}
 const double scanPeriod = 0.1;
 
-//初始化控制变量
-const int systemDelay = 20;//弃用前20帧初始数据
+//Initialize control variables [初始化控制变量]
+const int systemDelay = 20;//Discard the first 20 frames of initial data [弃用前20帧初始数据]
 int systemInitCount = 0;
 bool systemInited = false;
 
-//激光雷达线数
+//Number of laser radar lines [激光雷达线数]
 const int N_SCANS = 16;
 
-//点云曲率, 40000为一帧点云中点的最大数量
+//Point cloud curvature, 40000 is the maximum number of points in a frame of point cloud
+//[点云曲率, 40000为一帧点云中点的最大数量]
 float cloudCurvature[40000];
-//曲率点对应的序号
+//Serial number corresponding to the curvature point [曲率点对应的序号]
 int cloudSortInd[40000];
-//点是否筛选过标志：0-未筛选过，1-筛选过
+//Point filter flag: 0-not filtered, 1-filtered [点是否筛选过标志：0-未筛选过，1-筛选过]
 int cloudNeighborPicked[40000];
-//点分类标号:2-代表曲率很大，1-代表曲率比较大,-1-代表曲率很小，0-曲率比较小(其中1包含了2,0包含了1,0和1构成了点云全部的点)
+//Point classification number: 2-represents large curvature, 1-represents relatively large curvature, -1-represents small curvature, 0-relatively small curvature 
+//(where 1 includes 2, 0 includes 1, 0 and 1 constitute all the points in the point cloud)
+//[点分类标号:2-代表曲率很大，1-代表曲率比较大,-1-代表曲率很小，0-曲率比较小(其中1包含了2,0包含了1,0和1构成了点云全部的点)]
 int cloudLabel[40000];
 
-//imu时间戳大于当前点云时间戳的位置
+//The position where the imu timestamp is greater than the current point cloud timestamp [imu时间戳大于当前点云时间戳的位置]
 int imuPointerFront = 0;
-//imu最新收到的点在数组中的位置
+//The position of the most recently received point in the imu array [imu最新收到的点在数组中的位置]
 int imuPointerLast = -1;
-//imu循环队列长度
+//The length of the imu circular(?) queue [imu循环队列长度]
 const int imuQueLength = 200;
 
-//点云数据开始第一个点的位移/速度/欧拉角
+//Displacement/velocity/Euler angle of the first point of the point cloud data [点云数据开始第一个点的位移/速度/欧拉角]
 float imuRollStart = 0, imuPitchStart = 0, imuYawStart = 0;
 float imuRollCur = 0, imuPitchCur = 0, imuYawCur = 0;
 
 float imuVeloXStart = 0, imuVeloYStart = 0, imuVeloZStart = 0;
 float imuShiftXStart = 0, imuShiftYStart = 0, imuShiftZStart = 0;
 
-//当前点的速度，位移信息
+//Speed ​​and displacement information of the current point [当前点的速度，位移信息]
 float imuVeloXCur = 0, imuVeloYCur = 0, imuVeloZCur = 0;
 float imuShiftXCur = 0, imuShiftYCur = 0, imuShiftZCur = 0;
 
-//每次点云数据当前点相对于开始第一个点的畸变位移，速度
+//Distortion displacement and speed of the current point in each point cloud data relative to the first point [每次点云数据当前点相对于开始第一个点的畸变位移，速度]
 float imuShiftFromStartXCur = 0, imuShiftFromStartYCur = 0, imuShiftFromStartZCur = 0;
 float imuVeloFromStartXCur = 0, imuVeloFromStartYCur = 0, imuVeloFromStartZCur = 0;
 
-//IMU信息
+//IMU information [IMU信息]
 double imuTime[imuQueLength] = {0};
 float imuRoll[imuQueLength] = {0};
 float imuPitch[imuQueLength] = {0};
@@ -129,9 +137,11 @@ ros::Publisher pubSurfPointsFlat;
 ros::Publisher pubSurfPointsLessFlat;
 ros::Publisher pubImuTrans;
 
-//计算局部坐标系下点云中的点相对第一个开始点的由于加减速运动产生的位移畸变
+//Calculate the displacement distortion caused by acceleration and deceleration motion of the points in the point cloud relative to the first starting point in the local coordinate system
+//[计算局部坐标系下点云中的点相对第一个开始点的由于加减速运动产生的位移畸变]
 void ShiftToStartIMU(float pointTime)
 {
+  //Calculate the distortion displacement caused by acceleration and deceleration relative to the first point (distortion displacement delta_Tg in the global coordinate system)
   //计算相对于第一个点由于加减速产生的畸变位移(全局坐标系下畸变位移量delta_Tg)
   //imuShiftFromStartCur = imuShiftCur - (imuShiftStart + imuVeloStart * pointTime)
   imuShiftFromStartXCur = imuShiftXCur - imuShiftXStart - imuVeloXStart * pointTime;
@@ -143,25 +153,27 @@ void ShiftToStartIMU(float pointTime)
   transfrom from the global frame to the local frame
   *********************************************************************************/
 
-  //绕y轴旋转(-imuYawStart)，即Ry(yaw).inverse
+  //Rotate around the y-axis (-imuYawStart), i.e. Ry(yaw).inverse [绕y轴旋转(-imuYawStart)，即Ry(yaw).inverse]
   float x1 = cos(imuYawStart) * imuShiftFromStartXCur - sin(imuYawStart) * imuShiftFromStartZCur;
   float y1 = imuShiftFromStartYCur;
   float z1 = sin(imuYawStart) * imuShiftFromStartXCur + cos(imuYawStart) * imuShiftFromStartZCur;
 
-  //绕x轴旋转(-imuPitchStart)，即Rx(pitch).inverse
+  //Rotate around the x-axis (-imuPitchStart), i.e. Rx(pitch).inverse [绕x轴旋转(-imuPitchStart)，即Rx(pitch).inverse]
   float x2 = x1;
   float y2 = cos(imuPitchStart) * y1 + sin(imuPitchStart) * z1;
   float z2 = -sin(imuPitchStart) * y1 + cos(imuPitchStart) * z1;
 
-  //绕z轴旋转(-imuRollStart)，即Rz(pitch).inverse
+  //Rotate around the z-axis (-imuRollStart), i.e. Rz(pitch).inverse [绕z轴旋转(-imuRollStart)，即Rz(pitch).inverse]
   imuShiftFromStartXCur = cos(imuRollStart) * x2 + sin(imuRollStart) * y2;
   imuShiftFromStartYCur = -sin(imuRollStart) * x2 + cos(imuRollStart) * y2;
   imuShiftFromStartZCur = z2;
 }
 
+//Calculate the velocity distortion (increment) caused by acceleration and deceleration of the points in the point cloud in the local coordinate system relative to the first starting point
 //计算局部坐标系下点云中的点相对第一个开始点由于加减速产生的的速度畸变（增量）
 void VeloToStartIMU()
 {
+  //Calculate the distortion velocity due to acceleration and deceleration relative to the first point (distortion velocity increment delta_Vg in the global coordinate system)
   //计算相对于第一个点由于加减速产生的畸变速度(全局坐标系下畸变速度增量delta_Vg)
   imuVeloFromStartXCur = imuVeloXCur - imuVeloXStart;
   imuVeloFromStartYCur = imuVeloYCur - imuVeloYStart;
@@ -171,18 +183,18 @@ void VeloToStartIMU()
     Rz(pitch).inverse * Rx(pitch).inverse * Ry(yaw).inverse * delta_Vg
     transfrom from the global frame to the local frame
   *********************************************************************************/
-  
-  //绕y轴旋转(-imuYawStart)，即Ry(yaw).inverse
+
+  //Rotate around the y axis (-imuYawStart), i.e. Ry(yaw).inverse [绕y轴旋转(-imuYawStart)，即Ry(yaw).inverse]
   float x1 = cos(imuYawStart) * imuVeloFromStartXCur - sin(imuYawStart) * imuVeloFromStartZCur;
   float y1 = imuVeloFromStartYCur;
   float z1 = sin(imuYawStart) * imuVeloFromStartXCur + cos(imuYawStart) * imuVeloFromStartZCur;
 
-  //绕x轴旋转(-imuPitchStart)，即Rx(pitch).inverse
+  //Rotate around the x-axis (-imuPitchStart), i.e. Rx(pitch).inverse [绕x轴旋转(-imuPitchStart)，即Rx(pitch).inverse]
   float x2 = x1;
   float y2 = cos(imuPitchStart) * y1 + sin(imuPitchStart) * z1;
   float z2 = -sin(imuPitchStart) * y1 + cos(imuPitchStart) * z1;
 
-  //绕z轴旋转(-imuRollStart)，即Rz(pitch).inverse
+  //Rotate around the z-axis (-imuRollStart), i.e. Rz(pitch).inverse [绕z轴旋转(-imuRollStart)，即Rz(pitch).inverse]
   imuVeloFromStartXCur = cos(imuRollStart) * x2 + sin(imuRollStart) * y2;
   imuVeloFromStartYCur = -sin(imuRollStart) * x2 + cos(imuRollStart) * y2;
   imuVeloFromStartZCur = z2;
