@@ -608,20 +608,20 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
   pcl::PointCloud<PointType> surfPointsFlat;
   pcl::PointCloud<PointType> surfPointsLessFlat;
 
-  //将每条线上的点分入相应的类别：边沿点和平面点
+  //Classify points on each line into the appropriate categories: edge points and planar points [将每条线上的点分入相应的类别：边沿点和平面点]
   for (int i = 0; i < N_SCANS; i++) {
     pcl::PointCloud<PointType>::Ptr surfPointsLessFlatScan(new pcl::PointCloud<PointType>);
-    //将每个scan的曲率点分成6等份处理,确保周围都有点被选作特征点
+    //The curvature points of each scan are divided into 6 equal parts to ensure that all the surrounding points are selected as feature points [将每个scan的曲率点分成6等份处理,确保周围都有点被选作特征点]
     for (int j = 0; j < 6; j++) {
-        //六等份起点：sp = scanStartInd + (scanEndInd - scanStartInd)*j/6
+      //Starting point of six equal parts [六等份起点]：sp = scanStartInd + (scanEndInd - scanStartInd)*j/6
       int sp = (scanStartInd[i] * (6 - j)  + scanEndInd[i] * j) / 6;
-      //六等份终点：ep = scanStartInd - 1 + (scanEndInd - scanStartInd)*(j+1)/6
+      //End point of six equal parts [六等份终点]：ep = scanStartInd - 1 + (scanEndInd - scanStartInd)*(j+1)/6
       int ep = (scanStartInd[i] * (5 - j)  + scanEndInd[i] * (j + 1)) / 6 - 1;
 
-      //按曲率从小到大冒泡排序
+      //Bubble sort by curvature from smallest to largest [按曲率从小到大冒泡排序]
       for (int k = sp + 1; k <= ep; k++) {
         for (int l = k; l >= sp + 1; l--) {
-            //如果后面曲率点大于前面，则交换
+            //If the curvature point at the back is greater than the curvature point at the front, then swap [如果后面曲率点大于前面，则交换]
           if (cloudCurvature[cloudSortInd[l]] < cloudCurvature[cloudSortInd[l - 1]]) {
             int temp = cloudSortInd[l - 1];
             cloudSortInd[l - 1] = cloudSortInd[l];
@@ -630,30 +630,32 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
         }
       }
 
-      //挑选每个分段的曲率很大和比较大的点
+      //Pick points where the curvature of each segment is large and relatively large [挑选每个分段的曲率很大和比较大的点]
       int largestPickedNum = 0;
       for (int k = ep; k >= sp; k--) {
-        int ind = cloudSortInd[k];  //曲率最大点的点序
+        int ind = cloudSortInd[k];  //Point sequence of the point with maximum curvature [曲率最大点的点序]
 
-        //如果曲率大的点，曲率的确比较大，并且未被筛选过滤掉
+        //If the point has a large curvature, the curvature is indeed large and has not been filtered out [如果曲率大的点，曲率的确比较大，并且未被筛选过滤掉]
         if (cloudNeighborPicked[ind] == 0 &&
             cloudCurvature[ind] > 0.1) {
         
           largestPickedNum++;
-          if (largestPickedNum <= 2) {//挑选曲率最大的前2个点放入sharp点集合
-            cloudLabel[ind] = 2;//2代表点曲率很大
+          if (largestPickedNum <= 2) {//Pick the top 2 points with the largest curvature and put them into the sharp point set. [挑选曲率最大的前2个点放入sharp点集合]
+            cloudLabel[ind] = 2;//2 means that the point has a large curvature [2代表点曲率很大]
             cornerPointsSharp.push_back(laserCloud->points[ind]);
             cornerPointsLessSharp.push_back(laserCloud->points[ind]);
-          } else if (largestPickedNum <= 20) {//挑选曲率最大的前20个点放入less sharp点集合
-            cloudLabel[ind] = 1;//1代表点曲率比较尖锐
+          } else if (largestPickedNum <= 20) {//Pick the top 20 points with the highest curvature and put them into the less sharp point set. [挑选曲率最大的前20个点放入less sharp点集合]
+            cloudLabel[ind] = 1;//1 means the points have sharp curvature [1代表点曲率比较尖锐]
             cornerPointsLessSharp.push_back(laserCloud->points[ind]);
           } else {
             break;
           }
 
-          cloudNeighborPicked[ind] = 1;//筛选标志置位
+          cloudNeighborPicked[ind] = 1;//Filter Flag Set [筛选标志置位]
 
-          //将曲率比较大的点的前后各5个连续距离比较近的点筛选出去，防止特征点聚集，使得特征点在每个方向上尽量分布均匀
+          //Filter out the 5 consecutively close points in front of and behind the point with large curvature to prevent the feature points from clustering 
+          //and to make the feature points as evenly distributed as possible in each direction.
+          //[将曲率比较大的点的前后各5个连续距离比较近的点筛选出去，防止特征点聚集，使得特征点在每个方向上尽量分布均匀]
           for (int l = 1; l <= 5; l++) {
             float diffX = laserCloud->points[ind + l].x 
                         - laserCloud->points[ind + l - 1].x;
@@ -683,25 +685,25 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
         }
       }
 
-      //挑选每个分段的曲率很小比较小的点
+      //Select the points with small curvature in each segment. [挑选每个分段的曲率很小比较小的点]
       int smallestPickedNum = 0;
       for (int k = sp; k <= ep; k++) {
         int ind = cloudSortInd[k];
 
-        //如果曲率的确比较小，并且未被筛选出
+        //If the curvature is indeed small and not filtered out [如果曲率的确比较小，并且未被筛选出]
         if (cloudNeighborPicked[ind] == 0 &&
             cloudCurvature[ind] < 0.1) {
 
-          cloudLabel[ind] = -1;//-1代表曲率很小的点
+          cloudLabel[ind] = -1;//-1 represents the points with small curvature [-1代表曲率很小的点]
           surfPointsFlat.push_back(laserCloud->points[ind]);
 
           smallestPickedNum++;
-          if (smallestPickedNum >= 4) {//只选最小的四个，剩下的Label==0,就都是曲率比较小的
+          if (smallestPickedNum >= 4) {//Only select the smallest four, and the remaining Label==0, which means that the curvature is relatively small [只选最小的四个，剩下的Label==0,就都是曲率比较小的]
             break;
           }
 
           cloudNeighborPicked[ind] = 1;
-          for (int l = 1; l <= 5; l++) {//同样防止特征点聚集
+          for (int l = 1; l <= 5; l++) {//Also prevent feature point clustering [同样防止特征点聚集]
             float diffX = laserCloud->points[ind + l].x 
                         - laserCloud->points[ind + l - 1].x;
             float diffY = laserCloud->points[ind + l].y 
@@ -730,7 +732,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
         }
       }
 
-      //将剩余的点（包括之前被排除的点）全部归入平面点中less flat类别中
+      //Group all remaining points (including previously excluded points) into the less flat category of flat points. [将剩余的点（包括之前被排除的点）全部归入平面点中less flat类别中]
       for (int k = sp; k <= ep; k++) {
         if (cloudLabel[k] <= 0) {
           surfPointsLessFlatScan->push_back(laserCloud->points[k]);
@@ -738,25 +740,25 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
       }
     }
 
-    //由于less flat点最多，对每个分段less flat的点进行体素栅格滤波
+    //Since less flat points are the most numerous, perform voxel raster filtering on each segment of less flat points [由于less flat点最多，对每个分段less flat的点进行体素栅格滤波]
     pcl::PointCloud<PointType> surfPointsLessFlatScanDS;
     pcl::VoxelGrid<PointType> downSizeFilter;
     downSizeFilter.setInputCloud(surfPointsLessFlatScan);
     downSizeFilter.setLeafSize(0.2, 0.2, 0.2);
     downSizeFilter.filter(surfPointsLessFlatScanDS);
 
-    //less flat点汇总
+    //Less flat point summary [less flat点汇总]
     surfPointsLessFlat += surfPointsLessFlatScanDS;
   }
 
-  //publich消除非匀速运动畸变后的所有的点
+  //Publish all points after eliminating non-uniform motion distortion [publich消除非匀速运动畸变后的所有的点]
   sensor_msgs::PointCloud2 laserCloudOutMsg;
   pcl::toROSMsg(*laserCloud, laserCloudOutMsg);
   laserCloudOutMsg.header.stamp = laserCloudMsg->header.stamp;
   laserCloudOutMsg.header.frame_id = "/camera";
   pubLaserCloud.publish(laserCloudOutMsg);
 
-  //publich消除非匀速运动畸变后的平面点和边沿点
+  //Publish Plane and edge points after removal of nonuniform motion distortion [publich消除非匀速运动畸变后的平面点和边沿点]
   sensor_msgs::PointCloud2 cornerPointsSharpMsg;
   pcl::toROSMsg(cornerPointsSharp, cornerPointsSharpMsg);
   cornerPointsSharpMsg.header.stamp = laserCloudMsg->header.stamp;
@@ -781,19 +783,21 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
   surfPointsLessFlat2.header.frame_id = "/camera";
   pubSurfPointsLessFlat.publish(surfPointsLessFlat2);
 
-  //publich IMU消息,由于循环到了最后，因此是Cur都是代表最后一个点，即最后一个点的欧拉角，畸变位移及一个点云周期增加的速度
+  //publish IMU message, since the cycle is at the end, it is Cur that represents the last point, i.e., the Euler angle of the last point, the distortion displacement 
+  //and the speed of increase of a point cloud cycle.
+  //[publich IMU消息,由于循环到了最后，因此是Cur都是代表最后一个点，即最后一个点的欧拉角，畸变位移及一个点云周期增加的速度]
   pcl::PointCloud<pcl::PointXYZ> imuTrans(4, 1);
-  //起始点欧拉角
+  //Starting point Euler angle [起始点欧拉角]
   imuTrans.points[0].x = imuPitchStart;
   imuTrans.points[0].y = imuYawStart;
   imuTrans.points[0].z = imuRollStart;
 
-  //最后一个点的欧拉角
+  //Euler angle of the last point [最后一个点的欧拉角]
   imuTrans.points[1].x = imuPitchCur;
   imuTrans.points[1].y = imuYawCur;
   imuTrans.points[1].z = imuRollCur;
 
-  //最后一个点相对于第一个点的畸变位移和速度
+  //Aberration displacement and velocity of the last point relative to the first point. [最后一个点相对于第一个点的畸变位移和速度]
   imuTrans.points[2].x = imuShiftFromStartXCur;
   imuTrans.points[2].y = imuShiftFromStartYCur;
   imuTrans.points[2].z = imuShiftFromStartZCur;
@@ -809,7 +813,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
   pubImuTrans.publish(imuTransMsg);
 }
 
-//接收imu消息，imu坐标系为x轴向前，y轴向右，z轴向上的右手坐标系
+//Receive the imu message, the imu coordinate system is a right-handed coordinate system with x-axis forward, y-axis right, and z-axis up. [接收imu消息，imu坐标系为x轴向前，y轴向右，z轴向上的右手坐标系]
 void imuHandler(const sensor_msgs::Imu::ConstPtr& imuIn)
 {
   double roll, pitch, yaw;
@@ -820,12 +824,15 @@ void imuHandler(const sensor_msgs::Imu::ConstPtr& imuIn)
   //Here roll pitch yaw is in the global frame
   tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
 
-  //减去重力的影响,求出xyz方向的加速度实际值，并进行坐标轴交换，统一到z轴向前,x轴向左的右手坐标系, 交换过后RPY对应fixed axes ZXY(RPY---ZXY)。Now R = Ry(yaw)*Rx(pitch)*Rz(roll).
+  //Subtract the effect of gravity, find out the actual value of acceleration in xyz direction, and exchange the coordinate axes, 
+  //unify to the z-axis forward, x-axis to the left of the right-handed coordinate system, after the exchange of the RPY corresponds to the fixed axes ZXY (RPY --- ZXY).
+  //[减去重力的影响,求出xyz方向的加速度实际值，并进行坐标轴交换，统一到z轴向前,x轴向左的右手坐标系, 交换过后RPY对应fixed axes ZXY(RPY---ZXY)]
+  //Now R = Ry(yaw)*Rx(pitch)*Rz(roll).
   float accX = imuIn->linear_acceleration.y - sin(roll) * cos(pitch) * 9.81;
   float accY = imuIn->linear_acceleration.z - cos(roll) * cos(pitch) * 9.81;
   float accZ = imuIn->linear_acceleration.x + sin(pitch) * 9.81;
 
-  //循环移位效果，形成环形数组
+  //Circular shift effect, forming a circular array [循环移位效果，形成环形数组]
   imuPointerLast = (imuPointerLast + 1) % imuQueLength;
 
   imuTime[imuPointerLast] = imuIn->header.stamp.toSec();
