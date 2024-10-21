@@ -1,8 +1,8 @@
 # LOAM_NOTED
-LOAM中文注解版与相关论文，若有差错欢迎指正～
+I decided to translate the comments in Chinese for this beautiful work made by cuitaixiang (https://github.com/cuitaixiang).
+And also made this word as mine: "I'm sure you've never seen more detailed loam code notes than mine!"
 
-Here you can see the loam code noted in Chinese and the loam related papers.
+The translation process follows the pattern shown below, with the comment translate to English and the original comments in Chinese between brackets.
 
-I'm sure you've never seen more detailed loam code notes than mine!
-
-For non-Chinese users, Google Translate will help you.
+LOAM Chinese annotated version and related papers, if there are any errors, please correct them
+[LOAM中文注解版与相关论文，若有差错欢迎指正～]
