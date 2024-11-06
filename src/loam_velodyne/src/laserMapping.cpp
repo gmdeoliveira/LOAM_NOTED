@@ -46,21 +46,21 @@
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
 
-//扫描周期
+//Scan cycle [扫描周期]
 const float scanPeriod = 0.1;
 
-//控制接收到的点云数据，每隔几帧处理一次
+//Control the received point cloud data and process it every few frames [控制接收到的点云数据，每隔几帧处理一次]
 const int stackFrameNum = 1;
-//控制处理得到的点云map，每隔几次publich给rviz显示
+//Control the processed point cloud map and display it to rviz every few publish [控制处理得到的点云map，每隔几次publich给rviz显示]
 const int mapFrameNum = 5;
 
-//时间戳
+//Timestamp [时间戳]
 double timeLaserCloudCornerLast = 0;
 double timeLaserCloudSurfLast = 0;
 double timeLaserCloudFullRes = 0;
 double timeLaserOdometry = 0;
 
-//接收标志
+//Receive flag [接收标志]
 bool newLaserCloudCornerLast = false;
 bool newLaserCloudSurfLast = false;
 bool newLaserCloudFullRes = false;
@@ -72,65 +72,67 @@ int laserCloudCenDepth = 10;
 const int laserCloudWidth = 21;
 const int laserCloudHeight = 11;
 const int laserCloudDepth = 21;
-//点云方块集合最大数量
+//Maximum number of point cloud block sets [点云方块集合最大数量]
 const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;//4851
 
-//lidar视域范围内(FOV)的点云集索引
+//Point cloud set index within the lidar field of view (FOV) [lidar视域范围内(FOV)的点云集索引]
 int laserCloudValidInd[125];
-//lidar周围的点云集索引
+//Point cloud set index around the lidar [lidar周围的点云集索引]
 int laserCloudSurroundInd[125];
 
-//最新接收到的边沿点
+//Latest received edge point [最新接收到的边沿点]
 pcl::PointCloud<PointType>::Ptr laserCloudCornerLast(new pcl::PointCloud<PointType>());
-//最新接收到的平面点
+//Latest received plane point [最新接收到的平面点]
 pcl::PointCloud<PointType>::Ptr laserCloudSurfLast(new pcl::PointCloud<PointType>());
-//存放当前收到的下采样之后的边沿点(in the local frame)
+//Store the edge point after downsampling currently received [存放当前收到的下采样之后的边沿点](in the local frame)
 pcl::PointCloud<PointType>::Ptr laserCloudCornerStack(new pcl::PointCloud<PointType>());
-//存放当前收到的下采样之后的平面点(in the local frame)
+//Stores the plane points after downsampling currently received [存放当前收到的下采样之后的平面点](in the local frame)
 pcl::PointCloud<PointType>::Ptr laserCloudSurfStack(new pcl::PointCloud<PointType>());
-//存放当前收到的边沿点，作为下采样的数据源
+//Store the edge points currently received as the data source for downsampling [存放当前收到的边沿点，作为下采样的数据源]
 pcl::PointCloud<PointType>::Ptr laserCloudCornerStack2(new pcl::PointCloud<PointType>());
-//存放当前收到的平面点，作为下采样的数据源
+//Store the plane points currently received as the data source for downsampling [存放当前收到的平面点，作为下采样的数据源]
 pcl::PointCloud<PointType>::Ptr laserCloudSurfStack2(new pcl::PointCloud<PointType>());
-//原始点云坐标
+//Original point cloud coordinates [原始点云坐标]
 pcl::PointCloud<PointType>::Ptr laserCloudOri(new pcl::PointCloud<PointType>());
 pcl::PointCloud<PointType>::Ptr coeffSel(new pcl::PointCloud<PointType>());
-//匹配使用的特征点（下采样之后的）
+//Feature points used for matching (after downsampling) [匹配使用的特征点（下采样之后的)]
 pcl::PointCloud<PointType>::Ptr laserCloudSurround(new pcl::PointCloud<PointType>());
-//匹配使用的特征点（下采样之前的）
+//Feature points used for matching (before downsampling) [匹配使用的特征点（下采样之前的]
 pcl::PointCloud<PointType>::Ptr laserCloudSurround2(new pcl::PointCloud<PointType>());
-//map中提取的匹配使用的边沿点
+//The edge points used for matching extracted from the map [map中提取的匹配使用的边沿点]
 pcl::PointCloud<PointType>::Ptr laserCloudCornerFromMap(new pcl::PointCloud<PointType>());
-//map中提取的匹配使用的平面点
+//The plane points extracted from the map for matching [map中提取的匹配使用的平面点]
 pcl::PointCloud<PointType>::Ptr laserCloudSurfFromMap(new pcl::PointCloud<PointType>());
-//点云全部点
+//All points in the point cloud [点云全部点]
 pcl::PointCloud<PointType>::Ptr laserCloudFullRes(new pcl::PointCloud<PointType>());
-//array都是以50米为单位的立方体地图，运行过程中会一直保存(有需要的话可考虑优化，只保存近邻的，或者直接数组开小一点)
-//存放边沿点的cube
+//The array is a cube map with a unit of 50 meters, which will be saved during the operation (if necessary, you can consider optimizing it, saving only the nearest neighbors, or directly making the array smaller)
+//[array都是以50米为单位的立方体地图，运行过程中会一直保存(有需要的话可考虑优化，只保存近邻的，或者直接数组开小一点)]
+//Cube for storing edge points [存放边沿点的cube]
 pcl::PointCloud<PointType>::Ptr laserCloudCornerArray[laserCloudNum];
-//存放平面点的cube
+//Cube for storing plane points [存放平面点的cube]
 pcl::PointCloud<PointType>::Ptr laserCloudSurfArray[laserCloudNum];
-//中间变量，存放下采样过的边沿点
+//Intermediate variables, storing downsampled edge points [中间变量，存放下采样过的边沿点]
 pcl::PointCloud<PointType>::Ptr laserCloudCornerArray2[laserCloudNum];
-//中间变量，存放下采样过的平面点
+//Intermediate variables, storing downsampled plane points [中间变量，存放下采样过的平面点]
 pcl::PointCloud<PointType>::Ptr laserCloudSurfArray2[laserCloudNum];
 
 //kd-tree
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeCornerFromMap(new pcl::KdTreeFLANN<PointType>());
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
 
-/*************高频转换量**************/
-//odometry计算得到的到世界坐标系下的转移矩阵
+/*************High-frequency conversion amount [高频转换量]**************/
+//Transfer matrix to the world coordinate system calculated by odometry [odometry计算得到的到世界坐标系下的转移矩阵]
 float transformSum[6] = {0};
-//转移增量，只使用了后三个平移增量
+//Transfer increments, only the last three translation increments are used [转移增量，只使用了后三个平移增量]
 float transformIncre[6] = {0};
 
-/*************低频转换量*************/
-//以起始位置为原点的世界坐标系下的转换矩阵（猜测与调整的对象）
+/*************Low frequency conversion amount [低频转换量]*************/
+//Transformation matrix in the world coordinate system with the starting position as the origin (object of guessing and adjustment) [以起始位置为原点的世界坐标系下的转换矩阵（猜测与调整的对象)]
 float transformTobeMapped[6] = {0};
-//存放mapping之前的Odometry计算的世界坐标系的转换矩阵（注：低频量，不一定与transformSum一样）
+//Store the transformation matrix of the world coordinate system calculated by Odometry before mapping (Note: low-frequency amount, not necessarily the same as transformSum) 
+//[存放mapping之前的Odometry计算的世界坐标系的转换矩阵（注：低频量，不一定与transformSum一样）]
 float transformBefMapped[6] = {0};
-//存放mapping之后的经过mapping微调之后的转换矩阵
+//Store the transformation matrix after mapping after mapping fine-tuning [存放mapping之后的经过mapping微调之后的转换矩阵]
 float transformAftMapped[6] = {0};
 
 int imuPointerFront = 0;
@@ -141,7 +143,8 @@ double imuTime[imuQueLength] = {0};
 float imuRoll[imuQueLength] = {0};
 float imuPitch[imuQueLength] = {0};
 
-//基于匀速模型，根据上次微调的结果和odometry这次与上次计算的结果，猜测一个新的世界坐标系的转换矩阵transformTobeMapped
+//Based on the uniform speed model, guess a new world coordinate system transformation matrix transformTobeMapped based on the result of the last fine-tuning and the result of the odometry calculation this time and last time 
+//[基于匀速模型，根据上次微调的结果和odometry这次与上次计算的结果，猜测一个新的世界坐标系的转换矩阵transformTobeMapped]
 void transformAssociateToMap()
 {
   float x1 = cos(transformSum[1]) * (transformBefMapped[3] - transformSum[3]) 
@@ -154,7 +157,7 @@ void transformAssociateToMap()
   float y2 = cos(transformSum[0]) * y1 + sin(transformSum[0]) * z1;
   float z2 = -sin(transformSum[0]) * y1 + cos(transformSum[0]) * z1;
 
-  //平移增量
+  //Translation Increment [平移增量]
   transformIncre[3] = cos(transformSum[2]) * x2 + sin(transformSum[2]) * y2;
   transformIncre[4] = -sin(transformSum[2]) * x2 + cos(transformSum[2]) * y2;
   transformIncre[5] = z2;
@@ -230,12 +233,13 @@ void transformAssociateToMap()
                          - (-sin(transformTobeMapped[1]) * x2 + cos(transformTobeMapped[1]) * z2);
 }
 
-//记录odometry发送的转换矩阵与mapping之后的转换矩阵，下一帧点云会使用(有IMU的话会使用IMU进行补偿)
+//Record the transformation matrix sent by odometry and the transformation matrix after mapping, which will be used in the next frame of point cloud (if there is an IMU, it will be used for compensation) 
+//[记录odometry发送的转换矩阵与mapping之后的转换矩阵，下一帧点云会使用(有IMU的话会使用IMU进行补偿)]
 void transformUpdate()
 {
   if (imuPointerLast >= 0) {
     float imuRollLast = 0, imuPitchLast = 0;
-    //查找点云时间戳小于imu时间戳的imu位置
+    //Find the imu position where the point cloud timestamp is less than the imu timestamp [查找点云时间戳小于imu时间戳的imu位置]
     while (imuPointerFront != imuPointerLast) {
       if (timeLaserOdometry + scanPeriod < imuTime[imuPointerFront]) {
         break;
@@ -243,7 +247,7 @@ void transformUpdate()
       imuPointerFront = (imuPointerFront + 1) % imuQueLength;
     }
 
-    if (timeLaserOdometry + scanPeriod > imuTime[imuPointerFront]) {//未找到,此时imuPointerFront==imuPointerLast
+    if (timeLaserOdometry + scanPeriod > imuTime[imuPointerFront]) {//Not found, at this time [未找到,此时]imuPointerFront==imuPointerLast
       imuRollLast = imuRoll[imuPointerFront];
       imuPitchLast = imuPitch[imuPointerFront];
     } else {
@@ -253,39 +257,39 @@ void transformUpdate()
       float ratioBack = (imuTime[imuPointerFront] - timeLaserOdometry - scanPeriod) 
                       / (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
 
-      //按时间比例求翻滚角和俯仰角
+      //Calculate the roll angle and pitch angle according to the time ratio [按时间比例求翻滚角和俯仰角]
       imuRollLast = imuRoll[imuPointerFront] * ratioFront + imuRoll[imuPointerBack] * ratioBack;
       imuPitchLast = imuPitch[imuPointerFront] * ratioFront + imuPitch[imuPointerBack] * ratioBack;
     }
 
-    //imu稍微补偿俯仰角和翻滚角
+    //imu slightly compensates the pitch angle and roll angle [imu稍微补偿俯仰角和翻滚角]
     transformTobeMapped[0] = 0.998 * transformTobeMapped[0] + 0.002 * imuPitchLast;
     transformTobeMapped[2] = 0.998 * transformTobeMapped[2] + 0.002 * imuRollLast;
   }
 
-  //记录优化之前与之后的转移矩阵
+  //Record the transfer matrix before and after optimization [记录优化之前与之后的转移矩阵]
   for (int i = 0; i < 6; i++) {
     transformBefMapped[i] = transformSum[i];
     transformAftMapped[i] = transformTobeMapped[i];
   }
 }
 
-//根据调整计算后的转移矩阵，将点注册到全局世界坐标系下
+//Register the point to the global world coordinate system according to the adjusted calculated transfer matrix [根据调整计算后的转移矩阵，将点注册到全局世界坐标系下]
 void pointAssociateToMap(PointType const * const pi, PointType * const po)
 {
-  //绕z轴旋转（transformTobeMapped[2]）
+  //Rotate around the z-axis [绕z轴旋转]（transformTobeMapped[2]）
   float x1 = cos(transformTobeMapped[2]) * pi->x
            - sin(transformTobeMapped[2]) * pi->y;
   float y1 = sin(transformTobeMapped[2]) * pi->x
            + cos(transformTobeMapped[2]) * pi->y;
   float z1 = pi->z;
 
-  //绕x轴旋转（transformTobeMapped[0]）
+  //Rotate around the x-axis [绕x轴旋转]（transformTobeMapped[0]）
   float x2 = x1;
   float y2 = cos(transformTobeMapped[0]) * y1 - sin(transformTobeMapped[0]) * z1;
   float z2 = sin(transformTobeMapped[0]) * y1 + cos(transformTobeMapped[0]) * z1;
 
-  //绕y轴旋转（transformTobeMapped[1]），再平移
+  //Rotate around the y-axis [绕y轴旋转]（transformTobeMapped[1]），Translate [再平移]
   po->x = cos(transformTobeMapped[1]) * x2 + sin(transformTobeMapped[1]) * z2
         + transformTobeMapped[3];
   po->y = y2 + transformTobeMapped[4];
@@ -294,22 +298,22 @@ void pointAssociateToMap(PointType const * const pi, PointType * const po)
   po->intensity = pi->intensity;
 }
 
-//点转移到局部坐标系下
+//Transfer the point to the local coordinate system [点转移到局部坐标系下]
 void pointAssociateTobeMapped(PointType const * const pi, PointType * const po)
 {
-  //平移后绕y轴旋转（-transformTobeMapped[1]）
+  //Translate and then rotate around the y-axis [平移后绕y轴旋转]（-transformTobeMapped[1]）
   float x1 = cos(transformTobeMapped[1]) * (pi->x - transformTobeMapped[3]) 
            - sin(transformTobeMapped[1]) * (pi->z - transformTobeMapped[5]);
   float y1 = pi->y - transformTobeMapped[4];
   float z1 = sin(transformTobeMapped[1]) * (pi->x - transformTobeMapped[3]) 
            + cos(transformTobeMapped[1]) * (pi->z - transformTobeMapped[5]);
 
-  //绕x轴旋转（-transformTobeMapped[0]）
+  //Rotate around the x-axis [绕x轴旋转]（-transformTobeMapped[0]）
   float x2 = x1;
   float y2 = cos(transformTobeMapped[0]) * y1 + sin(transformTobeMapped[0]) * z1;
   float z2 = -sin(transformTobeMapped[0]) * y1 + cos(transformTobeMapped[0]) * z1;
 
-  //绕z轴旋转（-transformTobeMapped[2]）
+  //Rotate around the z axis [绕z轴旋转]（-transformTobeMapped[2]）
   po->x = cos(transformTobeMapped[2]) * x2
         + sin(transformTobeMapped[2]) * y2;
   po->y = -sin(transformTobeMapped[2]) * x2
@@ -318,7 +322,7 @@ void pointAssociateTobeMapped(PointType const * const pi, PointType * const po)
   po->intensity = pi->intensity;
 }
 
-//接收边沿点
+//Receive edge points [接收边沿点]
 void laserCloudCornerLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudCornerLast2)
 {
   timeLaserCloudCornerLast = laserCloudCornerLast2->header.stamp.toSec();
@@ -329,7 +333,7 @@ void laserCloudCornerLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserCl
   newLaserCloudCornerLast = true;
 }
 
-//接收平面点
+//Receive plane points [接收平面点]
 void laserCloudSurfLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudSurfLast2)
 {
   timeLaserCloudSurfLast = laserCloudSurfLast2->header.stamp.toSec();
@@ -340,7 +344,7 @@ void laserCloudSurfLastHandler(const sensor_msgs::PointCloud2ConstPtr& laserClou
   newLaserCloudSurfLast = true;
 }
 
-//接收点云全部点
+//Receive all points in the point cloud [接收点云全部点]
 void laserCloudFullResHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudFullRes2)
 {
   timeLaserCloudFullRes = laserCloudFullRes2->header.stamp.toSec();
@@ -351,13 +355,13 @@ void laserCloudFullResHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud
   newLaserCloudFullRes = true;
 }
 
-//接收旋转平移信息
+//Receive rotation and translation information [接收旋转平移信息]
 void laserOdometryHandler(const nav_msgs::Odometry::ConstPtr& laserOdometry)
 {
   timeLaserOdometry = laserOdometry->header.stamp.toSec();
 
   double roll, pitch, yaw;
-  //四元数转换为欧拉角
+  //Convert quaternion to Euler angle [四元数转换为欧拉角]
   geometry_msgs::Quaternion geoQuat = laserOdometry->pose.pose.orientation;
   tf::Matrix3x3(tf::Quaternion(geoQuat.z, -geoQuat.x, -geoQuat.y, geoQuat.w)).getRPY(roll, pitch, yaw);
 
@@ -372,7 +376,7 @@ void laserOdometryHandler(const nav_msgs::Odometry::ConstPtr& laserOdometry)
   newLaserOdometry = true;
 }
 
-//接收IMU信息，只使用了翻滚角和俯仰角
+//Receive IMU information, only roll angle and pitch angle are used [接收IMU信息，只使用了翻滚角和俯仰角]
 void imuHandler(const sensor_msgs::Imu::ConstPtr& imuIn)
 {
   double roll, pitch, yaw;
@@ -438,9 +442,9 @@ int main(int argc, char** argv)
   bool isDegenerate = false;
   cv::Mat matP(6, 6, CV_32F, cv::Scalar::all(0));
 
-  //创建VoxelGrid滤波器（体素栅格滤波器）
+  //Create VoxelGrid filter (voxel grid filter) [创建VoxelGrid滤波器（体素栅格滤波器)]
   pcl::VoxelGrid<PointType> downSizeFilterCorner;
-  //设置体素大小
+  //Set voxel size [设置体素大小]
   downSizeFilterCorner.setLeafSize(0.2, 0.2, 0.2);
 
   pcl::VoxelGrid<PointType> downSizeFilterSurf;
@@ -449,7 +453,7 @@ int main(int argc, char** argv)
   pcl::VoxelGrid<PointType> downSizeFilterMap;
   downSizeFilterMap.setLeafSize(0.6, 0.6, 0.6);
 
-  //指针初始化
+  //Pointer initialization [指针初始化]
   for (int i = 0; i < laserCloudNum; i++) {
     laserCloudCornerArray[i].reset(new pcl::PointCloud<PointType>());
     laserCloudSurfArray[i].reset(new pcl::PointCloud<PointType>());
@@ -474,12 +478,14 @@ int main(int argc, char** argv)
       newLaserOdometry = false;
 
       frameCount++;
-      //控制跳帧数，>=这里实际并没有跳帧，只取>或者增大stackFrameNum才能实现相应的跳帧处理
+      //Control the number of frame skips, >= There is no actual frame skipping here, only > or increase stackFrameNum to achieve the corresponding frame skipping processing 
+      //[控制跳帧数，>=这里实际并没有跳帧，只取>或者增大stackFrameNum才能实现相应的跳帧处理]
       if (frameCount >= stackFrameNum) {
-        //获取世界坐标系转换矩阵
+        //Get the world coordinate system transformation matrix [获取世界坐标系转换矩阵]
         transformAssociateToMap();
 
-        //将最新接收到的平面点和边沿点进行旋转平移转换到世界坐标系下(这里和后面的逆转换应无必要)
+        //Rotate and translate the latest received plane points and edge points to the world coordinate system (this and the subsequent inverse transformation should not be necessary) 
+        //[将最新接收到的平面点和边沿点进行旋转平移转换到世界坐标系下(这里和后面的逆转换应无必要)]
         int laserCloudCornerLastNum = laserCloudCornerLast->points.size();
         for (int i = 0; i < laserCloudCornerLastNum; i++) {
           pointAssociateToMap(&laserCloudCornerLast->points[i], &pointSel);
@@ -500,40 +506,45 @@ int main(int argc, char** argv)
         pointOnYAxis.x = 0.0;
         pointOnYAxis.y = 10.0;
         pointOnYAxis.z = 0.0;
-        //获取y方向上10米高位置的点在世界坐标系下的坐标
+        //Get the coordinates of the point at a height of 10 meters in the y direction in the world coordinate system [获取y方向上10米高位置的点在世界坐标系下的坐标]
         pointAssociateToMap(&pointOnYAxis, &pointOnYAxis);
 
-        //立方体中点在世界坐标系下的（原点）位置
-        //过半取一（以50米进行四舍五入的效果），由于数组下标只能为正数，而地图可能建立在原点前后，因此
-        //每一维偏移一个laserCloudCenWidth（该值会动态调整，以使得数组利用最大化，初始值为该维数组长度1/2）的量
+        //The (origin) position of the midpoint of the cube in the world coordinate system [立方体中点在世界坐标系下的（原点）位置]
+        //Take half of the value (rounded to 50 meters). Since the array subscript can only be positive, and the map may be built before or after the origin 
+        //[过半取一（以50米进行四舍五入的效果），由于数组下标只能为正数，而地图可能建立在原点前后，因此]
+        //Offset each dimension by a laserCloudCenWidth (this value will be adjusted dynamically to maximize the use of the array, and the initial value is 1/2 of the length of the array in that dimension) 
+        //[每一维偏移一个laserCloudCenWidth（该值会动态调整，以使得数组利用最大化，初始值为该维数组长度1/2）的量]
         int centerCubeI = int((transformTobeMapped[3] + 25.0) / 50.0) + laserCloudCenWidth;
         int centerCubeJ = int((transformTobeMapped[4] + 25.0) / 50.0) + laserCloudCenHeight;
         int centerCubeK = int((transformTobeMapped[5] + 25.0) / 50.0) + laserCloudCenDepth;
 
-        //由于计算机求余是向零取整，为了不使（-50.0,50.0）求余后都向零偏移，当被求余数为负数时求余结果统一向左偏移一个单位，也即减一
+        //Since the computer is rounded to zero, in order to prevent (-50.0,50.0) from being offset to zero after the remainder is taken, when the remainder is negative, 
+        //the remainder result is uniformly offset to the left by one unit, that is, minus one
+        //[由于计算机求余是向零取整，为了不使（-50.0,50.0）求余后都向零偏移，当被求余数为负数时求余结果统一向左偏移一个单位，也即减一]
         if (transformTobeMapped[3] + 25.0 < 0) centerCubeI--;
         if (transformTobeMapped[4] + 25.0 < 0) centerCubeJ--;
         if (transformTobeMapped[5] + 25.0 < 0) centerCubeK--;
 
-        //调整之后取值范围:3 < centerCubeI < 18， 3 < centerCubeJ < 8, 3 < centerCubeK < 18
-        //如果处于下边界，表明地图向负方向延伸的可能性比较大，则循环移位，将数组中心点向上边界调整一个单位
+        //After adjustment, the value range [调整之后取值范围]:3 < centerCubeI < 18， 3 < centerCubeJ < 8, 3 < centerCubeK < 18
+        //If it is at the lower boundary, it means that the map is likely to extend in the negative direction, so the center point of the array is shifted circularly and adjusted by one unit to the upper boundary.
+        //[如果处于下边界，表明地图向负方向延伸的可能性比较大，则循环移位，将数组中心点向上边界调整一个单位]
         while (centerCubeI < 3) {
           for (int j = 0; j < laserCloudHeight; j++) {
-            for (int k = 0; k < laserCloudDepth; k++) {//实现一次循环移位效果
+            for (int k = 0; k < laserCloudDepth; k++) {//Achieve a circular shift effect [实现一次循环移位效果]
               int i = laserCloudWidth - 1;
-              //指针赋值，保存最后一个指针位置
+              //Pointer assignment, save the last pointer position [指针赋值，保存最后一个指针位置]
               pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
               laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];//that's [i + 21 * j + 231 * k]
               pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
               laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
-              //循环移位，I维度上依次后移
+              //Circular shift, shift back in the I dimension in sequence [循环移位，I维度上依次后移]
               for (; i >= 1; i--) {
                 laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                 laserCloudCornerArray[i - 1 + laserCloudWidth*j + laserCloudWidth * laserCloudHeight * k];
                 laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                 laserCloudSurfArray[i - 1 + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
               }
-              //将开始点赋值为最后一个点
+              //Assign the starting point to the last point [将开始点赋值为最后一个点]
               laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] = 
               laserCloudCubeCornerPointer;
               laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] = 
@@ -547,7 +558,8 @@ int main(int argc, char** argv)
           laserCloudCenWidth++;
         }
 
-        //如果处于上边界，表明地图向正方向延伸的可能性比较大，则循环移位，将数组中心点向下边界调整一个单位
+        //If it is at the upper boundary, it means that the map is likely to extend in the positive direction, so the array center point is shifted circularly to the lower boundary by one unit. 
+        //[如果处于上边界，表明地图向正方向延伸的可能性比较大，则循环移位，将数组中心点向下边界调整一个单位]
         while (centerCubeI >= laserCloudWidth - 3) {//18
           for (int j = 0; j < laserCloudHeight; j++) {
             for (int k = 0; k < laserCloudDepth; k++) {
@@ -556,7 +568,7 @@ int main(int argc, char** argv)
               laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
               pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
               laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
-              //I维度上依次前移
+              //Move forward in the I dimension [I维度上依次前移]
               for (; i < laserCloudWidth - 1; i++) {
                 laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                 laserCloudCornerArray[i + 1 + laserCloudWidth*j + laserCloudWidth * laserCloudHeight * k];
@@ -584,7 +596,7 @@ int main(int argc, char** argv)
               laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
               pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
               laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
-              //J维度上，依次后移
+              //Move backward in the J dimension [J维度上，依次后移]
               for (; j >= 1; j--) {
                 laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                 laserCloudCornerArray[i + laserCloudWidth*(j - 1) + laserCloudWidth * laserCloudHeight*k];
@@ -612,7 +624,7 @@ int main(int argc, char** argv)
               laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
               pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
               laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
-              //J维度上一次前移
+              //Move backward in the J dimension [J维度上一次前移]
               for (; j < laserCloudHeight - 1; j++) {
                 laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                 laserCloudCornerArray[i + laserCloudWidth*(j + 1) + laserCloudWidth * laserCloudHeight*k];
@@ -668,7 +680,7 @@ int main(int argc, char** argv)
               laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
               pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
               laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
-              //K维度上依次前移
+              //Move backward in the K dimension [K维度上依次前移]
               for (; k < laserCloudDepth - 1; k++) {
                 laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
                 laserCloudCornerArray[i + laserCloudWidth*j + laserCloudWidth * laserCloudHeight*(k + 1)];
@@ -690,8 +702,9 @@ int main(int argc, char** argv)
 
         int laserCloudValidNum = 0;
         int laserCloudSurroundNum = 0;
-        //在每一维附近5个cube(前2个，后2个，中间1个)里进行查找（前后250米范围内，总共500米范围），三个维度总共125个cube
-        //在这125个cube里面进一步筛选在视域范围内的cube
+        //Search in the 5 cubes near each dimension (the first 2, the last 2, and the middle 1) (within 250 meters before and after, a total of 500 meters), a total of 125 cubes in three dimensions 
+        //[在每一维附近5个cube(前2个，后2个，中间1个)里进行查找（前后250米范围内，总共500米范围），三个维度总共125个cube]
+        //Further filter the cubes within the field of view in these 125 cubes [在这125个cube里面进一步筛选在视域范围内的cube]
         for (int i = centerCubeI - 2; i <= centerCubeI + 2; i++) {
           for (int j = centerCubeJ - 2; j <= centerCubeJ + 2; j++) {
             for (int k = centerCubeK - 2; k <= centerCubeK + 2; k++) {
@@ -699,21 +712,21 @@ int main(int argc, char** argv)
                   j >= 0 && j < laserCloudHeight && 
                   k >= 0 && k < laserCloudDepth) {//如果索引合法
 
-                //换算成实际比例，在世界坐标系下的坐标
+                //Convert to the actual scale, the coordinates in the world coordinate system [换算成实际比例，在世界坐标系下的坐标]
                 float centerX = 50.0 * (i - laserCloudCenWidth);
                 float centerY = 50.0 * (j - laserCloudCenHeight);
                 float centerZ = 50.0 * (k - laserCloudCenDepth);
 
-                bool isInLaserFOV = false;//判断是否在lidar视线范围的标志（Field of View）
+                bool isInLaserFOV = false;//A sign to determine whether it is within the lidar line of sight [判断是否在lidar视线范围的标志]（Field of View）
                 for (int ii = -1; ii <= 1; ii += 2) {
                   for (int jj = -1; jj <= 1; jj += 2) {
                     for (int kk = -1; kk <= 1; kk += 2) {
-                      //上下左右八个顶点坐标
+                      //Eight vertex coordinates of top, bottom, left, and right [上下左右八个顶点坐标]
                       float cornerX = centerX + 25.0 * ii;
                       float cornerY = centerY + 25.0 * jj;
                       float cornerZ = centerZ + 25.0 * kk;
 
-                      //原点到顶点距离的平方和
+                      //Sum of squares of distances from the origin to the vertex [原点到顶点距离的平方和]
                       float squaredSide1 = (transformTobeMapped[3] - cornerX) 
                                          * (transformTobeMapped[3] - cornerX) 
                                          + (transformTobeMapped[4] - cornerY) 
@@ -721,7 +734,7 @@ int main(int argc, char** argv)
                                          + (transformTobeMapped[5] - cornerZ) 
                                          * (transformTobeMapped[5] - cornerZ);
 
-                      //pointOnYAxis到顶点距离的平方和
+                      //Sum of squares of distances from pointOnYAxis to the vertex [pointOnYAxis到顶点距离的平方和]
                       float squaredSide2 = (pointOnYAxis.x - cornerX) * (pointOnYAxis.x - cornerX) 
                                          + (pointOnYAxis.y - cornerY) * (pointOnYAxis.y - cornerY)
                                          + (pointOnYAxis.z - cornerZ) * (pointOnYAxis.z - cornerZ);
@@ -739,13 +752,13 @@ int main(int argc, char** argv)
                   }
                 }
 
-                //记住视域范围内的cube索引，匹配用
+                //Remember the cube index within the field of view, and use it for matching [记住视域范围内的cube索引，匹配用]
                 if (isInLaserFOV) {
                   laserCloudValidInd[laserCloudValidNum] = i + laserCloudWidth * j 
                                                        + laserCloudWidth * laserCloudHeight * k;
                   laserCloudValidNum++;
                 }
-                //记住附近所有cube的索引，显示用
+                //Remember the indexes of all nearby cubes for display [记住附近所有cube的索引，显示用]
                 laserCloudSurroundInd[laserCloudSurroundNum] = i + laserCloudWidth * j 
                                                              + laserCloudWidth * laserCloudHeight * k;
                 laserCloudSurroundNum++;
@@ -756,7 +769,7 @@ int main(int argc, char** argv)
 
         laserCloudCornerFromMap->clear();
         laserCloudSurfFromMap->clear();
-        //构建特征点地图，查找匹配使用
+        //Build a feature point map and use it to find matches [构建特征点地图，查找匹配使用]
         for (int i = 0; i < laserCloudValidNum; i++) {
           *laserCloudCornerFromMap += *laserCloudCornerArray[laserCloudValidInd[i]];
           *laserCloudSurfFromMap += *laserCloudSurfArray[laserCloudValidInd[i]];
@@ -765,9 +778,12 @@ int main(int argc, char** argv)
         int laserCloudSurfFromMapNum = laserCloudSurfFromMap->points.size();
 
         /***********************************************************************
-          此处将特征点转移回local坐标系，是为了voxel grid filter的下采样操作不越
+         Here, the feature points are transferred back to the local coordinate system to prevent the downsampling operation of the voxel grid filter from crossing the boundary? It seems not! 
+         Later, it will be transferred back to the world coordinate system. This is the inverse transformation of the previous one. It should not be necessary. 
+         You can directly downsample the laserCloudCornerLast and laserCloudSurfLast.
+          [此处将特征点转移回local坐标系，是为了voxel grid filter的下采样操作不越
           界？好像不是！后面还会转移回世界坐标系，这里是前面的逆转换，和前面一样
-          应无必要，可直接对laserCloudCornerLast和laserCloudSurfLast进行下采样
+          应无必要，可直接对laserCloudCornerLast和laserCloudSurfLast进行下采样]
         ***********************************************************************/
         int laserCloudCornerStackNum2 = laserCloudCornerStack2->points.size();
         for (int i = 0; i < laserCloudCornerStackNum2; i++) {
@@ -780,9 +796,9 @@ int main(int argc, char** argv)
         }
 
         laserCloudCornerStack->clear();
-        downSizeFilterCorner.setInputCloud(laserCloudCornerStack2);//设置滤波对象
-        downSizeFilterCorner.filter(*laserCloudCornerStack);//执行滤波处理
-        int laserCloudCornerStackNum = laserCloudCornerStack->points.size();//获取滤波后体素点尺寸
+        downSizeFilterCorner.setInputCloud(laserCloudCornerStack2);//Set the filter object [设置滤波对象]
+        downSizeFilterCorner.filter(*laserCloudCornerStack);//Perform filtering [执行滤波处理]
+        int laserCloudCornerStackNum = laserCloudCornerStack->points.size();//Get the size of the voxel point after filtering [获取滤波后体素点尺寸]
 
         laserCloudSurfStack->clear();
         downSizeFilterSurf.setInputCloud(laserCloudSurfStack2);
@@ -793,21 +809,21 @@ int main(int argc, char** argv)
         laserCloudSurfStack2->clear();
 
         if (laserCloudCornerFromMapNum > 10 && laserCloudSurfFromMapNum > 100) {
-          kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMap);//构建kd-tree
+          kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMap);//Construct [构建]kd-tree
           kdtreeSurfFromMap->setInputCloud(laserCloudSurfFromMap);
 
-          for (int iterCount = 0; iterCount < 10; iterCount++) {//最多迭代10次
+          for (int iterCount = 0; iterCount < 10; iterCount++) {//Iterate up to 10 times [最多迭代10次]
             laserCloudOri->clear();
             coeffSel->clear();
 
             for (int i = 0; i < laserCloudCornerStackNum; i++) {
               pointOri = laserCloudCornerStack->points[i];
-              //转换回世界坐标系
+              //Convert back to world coordinate system [转换回世界坐标系]
               pointAssociateToMap(&pointOri, &pointSel);
-              kdtreeCornerFromMap->nearestKSearch(pointSel, 5, pointSearchInd, pointSearchSqDis);//寻找最近距离五个点
+              kdtreeCornerFromMap->nearestKSearch(pointSel, 5, pointSearchInd, pointSearchSqDis);//Find the five points with the closest distance [寻找最近距离五个点]
               
-              if (pointSearchSqDis[4] < 1.0) {//5个点中最大距离不超过1才处理
-                //将五个最近点的坐标加和求平均
+              if (pointSearchSqDis[4] < 1.0) {//Process only if the maximum distance among the five points does not exceed 1 [5个点中最大距离不超过1才处理]
+                //Sum the coordinates of the five closest points and find the average [将五个最近点的坐标加和求平均]
                 float cx = 0;
                 float cy = 0; 
                 float cz = 0;
@@ -820,7 +836,7 @@ int main(int argc, char** argv)
                 cy /= 5; 
                 cz /= 5;
 
-                //求均方差
+                //Find the mean square error [求均方差]
                 float a11 = 0;
                 float a12 = 0; 
                 float a13 = 0;
@@ -846,7 +862,7 @@ int main(int argc, char** argv)
                 a23 /= 5; 
                 a33 /= 5;
 
-                //构建矩阵
+                //Construct matrix [构建矩阵]
                 matA1.at<float>(0, 0) = a11;
                 matA1.at<float>(0, 1) = a12;
                 matA1.at<float>(0, 2) = a13;
@@ -857,10 +873,10 @@ int main(int argc, char** argv)
                 matA1.at<float>(2, 1) = a23;
                 matA1.at<float>(2, 2) = a33;
 
-                //特征值分解
+                //Eigenvalue decomposition [特征值分解]
                 cv::eigen(matA1, matD1, matV1);
 
-                if (matD1.at<float>(0, 0) > 3 * matD1.at<float>(0, 1)) {//如果最大的特征值大于第二大的特征值三倍以上
+                if (matD1.at<float>(0, 0) > 3 * matD1.at<float>(0, 1)) {//If the largest eigenvalue is more than three times larger than the second largest eigenvalue [如果最大的特征值大于第二大的特征值三倍以上]
 
                   float x0 = pointSel.x;
                   float y0 = pointSel.y;
@@ -898,7 +914,7 @@ int main(int argc, char** argv)
                   pointProj.y -= lb * ld2;
                   pointProj.z -= lc * ld2;
 
-                  //权重系数计算
+                  //Weight coefficient calculation [权重系数计算]
                   float s = 1 - 0.9 * fabs(ld2);
 
                   coeff.x = s * la;
@@ -906,7 +922,7 @@ int main(int argc, char** argv)
                   coeff.z = s * lc;
                   coeff.intensity = s * ld2;
 
-                  if (s > 0.1) {//距离足够小才使用
+                  if (s > 0.1) {//Use only if the distance is small enough [距离足够小才使用]
                     laserCloudOri->push_back(pointOri);
                     coeffSel->push_back(coeff);
                   }
@@ -920,13 +936,13 @@ int main(int argc, char** argv)
               kdtreeSurfFromMap->nearestKSearch(pointSel, 5, pointSearchInd, pointSearchSqDis);
 
               if (pointSearchSqDis[4] < 1.0) {
-                //构建五个最近点的坐标矩阵
+                //Construct the coordinate matrix of the five closest points [构建五个最近点的坐标矩阵]
                 for (int j = 0; j < 5; j++) {
                   matA0.at<float>(j, 0) = laserCloudSurfFromMap->points[pointSearchInd[j]].x;
                   matA0.at<float>(j, 1) = laserCloudSurfFromMap->points[pointSearchInd[j]].y;
                   matA0.at<float>(j, 2) = laserCloudSurfFromMap->points[pointSearchInd[j]].z;
                 }
-                //求解matA0*matX0=matB0
+                //Solve [求解]matA0*matX0=matB0
                 cv::solve(matA0, matB0, matX0, cv::DECOMP_QR);
 
                 float pa = matX0.at<float>(0, 0);
@@ -983,7 +999,7 @@ int main(int argc, char** argv)
             float crz = cos(transformTobeMapped[2]);
 
             int laserCloudSelNum = laserCloudOri->points.size();
-            if (laserCloudSelNum < 50) {//如果特征点太少
+            if (laserCloudSelNum < 50) {//If there are too few feature points [如果特征点太少]
               continue;
             }
 
@@ -1023,7 +1039,7 @@ int main(int argc, char** argv)
             matAtB = matAt * matB;
             cv::solve(matAtA, matAtB, matX, cv::DECOMP_QR);
 
-            //退化场景判断与处理
+            //Degraded scene judgment and processing [退化场景判断与处理]
             if (iterCount == 0) {
               cv::Mat matE(1, 6, CV_32F, cv::Scalar::all(0));
               cv::Mat matV(6, 6, CV_32F, cv::Scalar::all(0));
@@ -1053,7 +1069,7 @@ int main(int argc, char** argv)
               matX = matP * matX2;
             }
 
-            //积累每次的调整量
+            //Accumulate the amount of adjustment each time [积累每次的调整量]
             transformTobeMapped[0] += matX.at<float>(0, 0);
             transformTobeMapped[1] += matX.at<float>(1, 0);
             transformTobeMapped[2] += matX.at<float>(2, 0);
@@ -1070,22 +1086,22 @@ int main(int argc, char** argv)
                                 pow(matX.at<float>(4, 0) * 100, 2) +
                                 pow(matX.at<float>(5, 0) * 100, 2));
 
-            //旋转平移量足够小就停止迭代
+            //Stop iteration when the rotation and translation amount are small enough [旋转平移量足够小就停止迭代]
             if (deltaR < 0.05 && deltaT < 0.05) {
               break;
             }
           }
 
-          //迭代结束更新相关的转移矩阵
+          //Update the relevant transfer matrix after iteration [迭代结束更新相关的转移矩阵]
           transformUpdate();
         }
 
-        //将corner points按距离（比例尺缩小）归入相应的立方体
+        //Assign the corner points to the corresponding cubes according to the distance (reduced scale) [将corner points按距离（比例尺缩小）归入相应的立方体]
         for (int i = 0; i < laserCloudCornerStackNum; i++) {
-          //转移到世界坐标系
+          //Transfer to world coordinate system [转移到世界坐标系]
           pointAssociateToMap(&laserCloudCornerStack->points[i], &pointSel);
 
-          //按50的比例尺缩小，四舍五入，偏移laserCloudCen*的量，计算索引
+          //Scale down by 50, round up, offset by laserCloudCen*, calculate index [按50的比例尺缩小，四舍五入，偏移laserCloudCen*的量，计算索引]
           int cubeI = int((pointSel.x + 25.0) / 50.0) + laserCloudCenWidth;
           int cubeJ = int((pointSel.y + 25.0) / 50.0) + laserCloudCenHeight;
           int cubeK = int((pointSel.z + 25.0) / 50.0) + laserCloudCenDepth;
@@ -1096,14 +1112,15 @@ int main(int argc, char** argv)
 
           if (cubeI >= 0 && cubeI < laserCloudWidth && 
               cubeJ >= 0 && cubeJ < laserCloudHeight && 
-              cubeK >= 0 && cubeK < laserCloudDepth) {//只挑选-laserCloudCenWidth * 50.0 < point.x < laserCloudCenWidth * 50.0范围内的点，y和z同理
-              //按照尺度放进不同的组，每个组的点数量各异
+              cubeK >= 0 && cubeK < laserCloudDepth) {
+            //Only select points within the range -laserCloudCenWidth * 50.0 < point.x < laserCloudCenWidth * 50.0, same for y and z [只挑选-laserCloudCenWidth * 50.0 < point.x < laserCloudCenWidth * 50.0范围内的点，y和z同理]
+              //Put them into different groups according to the scale, and the number of points in each group is different [按照尺度放进不同的组，每个组的点数量各异]
             int cubeInd = cubeI + laserCloudWidth * cubeJ + laserCloudWidth * laserCloudHeight * cubeK;
             laserCloudCornerArray[cubeInd]->push_back(pointSel);
           }
         }
 
-        //将surf points按距离（比例尺缩小）归入相应的立方体
+        //Put surf points into corresponding cubes by distance (scale down) [将surf points按距离（比例尺缩小）归入相应的立方体]
         for (int i = 0; i < laserCloudSurfStackNum; i++) {
           pointAssociateToMap(&laserCloudSurfStack->points[i], &pointSel);
 
@@ -1123,19 +1140,19 @@ int main(int argc, char** argv)
           }
         }
 
-        //特征点下采样
+        //Downsample feature points [特征点下采样]
         for (int i = 0; i < laserCloudValidNum; i++) {
           int ind = laserCloudValidInd[i];
 
           laserCloudCornerArray2[ind]->clear();
           downSizeFilterCorner.setInputCloud(laserCloudCornerArray[ind]);
-          downSizeFilterCorner.filter(*laserCloudCornerArray2[ind]);//滤波输出到Array2
+          downSizeFilterCorner.filter(*laserCloudCornerArray2[ind]);//Filter output to Array2 [滤波输出到Array2]
 
           laserCloudSurfArray2[ind]->clear();
           downSizeFilterSurf.setInputCloud(laserCloudSurfArray[ind]);
           downSizeFilterSurf.filter(*laserCloudSurfArray2[ind]);
 
-          //Array与Array2交换，即滤波后自我更新
+          //Array is exchanged with Array2, i.e. it updates itself after filtering [Array与Array2交换，即滤波后自我更新]
           pcl::PointCloud<PointType>::Ptr laserCloudTemp = laserCloudCornerArray[ind];
           laserCloudCornerArray[ind] = laserCloudCornerArray2[ind];
           laserCloudCornerArray2[ind] = laserCloudTemp;
@@ -1146,7 +1163,7 @@ int main(int argc, char** argv)
         }
 
         mapFrameCount++;
-        //特征点汇总下采样，每隔五帧publish一次，从第一次开始
+        //Feature points are aggregated and downsampled, published every five frames, starting from the first [特征点汇总下采样，每隔五帧publish一次，从第一次开始]
         if (mapFrameCount >= mapFrameNum) {
           mapFrameCount = 0;
 
@@ -1168,7 +1185,7 @@ int main(int argc, char** argv)
           pubLaserCloudSurround.publish(laserCloudSurround3);
         }
 
-        //将点云中全部点转移到世界坐标系下
+        //Transfer all points in the point cloud to the world coordinate system [将点云中全部点转移到世界坐标系下]
         int laserCloudFullResNum = laserCloudFullRes->points.size();
         for (int i = 0; i < laserCloudFullResNum; i++) {
           pointAssociateToMap(&laserCloudFullRes->points[i], &laserCloudFullRes->points[i]);
@@ -1191,7 +1208,7 @@ int main(int argc, char** argv)
         odomAftMapped.pose.pose.position.x = transformAftMapped[3];
         odomAftMapped.pose.pose.position.y = transformAftMapped[4];
         odomAftMapped.pose.pose.position.z = transformAftMapped[5];
-        //扭转量
+        //Twist amount [扭转量]
         odomAftMapped.twist.twist.angular.x = transformBefMapped[0];
         odomAftMapped.twist.twist.angular.y = transformBefMapped[1];
         odomAftMapped.twist.twist.angular.z = transformBefMapped[2];
@@ -1200,7 +1217,7 @@ int main(int argc, char** argv)
         odomAftMapped.twist.twist.linear.z = transformBefMapped[5];
         pubOdomAftMapped.publish(odomAftMapped);
 
-        //广播坐标系旋转平移参量
+        //Broadcast coordinate system rotation and translation parameters [广播坐标系旋转平移参量]
         aftMappedTrans.stamp_ = ros::Time().fromSec(timeLaserOdometry);
         aftMappedTrans.setRotation(tf::Quaternion(-geoQuat.y, -geoQuat.z, geoQuat.x, geoQuat.w));
         aftMappedTrans.setOrigin(tf::Vector3(transformAftMapped[3], 
